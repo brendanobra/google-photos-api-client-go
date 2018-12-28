@@ -23,7 +23,8 @@ const basePath = "https://photoslibrary.googleapis.com/"
 type Client struct {
 	*photoslibrary.Service
 	*http.Client
-	token *oauth2.Token
+	token              *oauth2.Token
+	createdAlbumsCache map[string]photoslibrary.Album
 }
 
 // Token returns the value of the token used by the gphotos Client
@@ -50,7 +51,8 @@ func NewClient(oauthHTTPClient *http.Client, maybeToken ...*oauth2.Token) (*Clie
 	if err != nil {
 		return nil, err
 	}
-	return &Client{photosService, oauthHTTPClient, token}, nil
+
+	return &Client{photosService, oauthHTTPClient, token, make(map[string]photoslibrary.Album)}, nil
 }
 
 // GetUploadToken sends the media and returns the UploadToken.
@@ -85,7 +87,9 @@ func (client *Client) UploadFile(filePath string, pAlbumID ...string) (*photosli
 	}
 	var albumID string
 	if len(pAlbumID) == 1 {
+
 		albumID = pAlbumID[0]
+		log.Println("albumId=" + albumID)
 	}
 
 	filename := path.Base(filePath)
@@ -148,7 +152,11 @@ func (client *Client) GetOrCreateAlbumByName(albumName string) (*photoslibrary.A
 		}
 	}
 
-	// try to find album by name
+	if val, ok := client.createdAlbumsCache[albumName]; ok {
+		log.Println("album=" + albumName + " located in cache")
+		return &val, nil
+	}
+
 	album, found, err := client.AlbumByName(albumName)
 	if err != nil {
 		return nil, err
@@ -158,11 +166,16 @@ func (client *Client) GetOrCreateAlbumByName(albumName string) (*photoslibrary.A
 	}
 
 	// else create album
-	return client.Albums.Create(&photoslibrary.CreateAlbumRequest{
+	var newAlbum, newAlbumerr = client.Albums.Create(&photoslibrary.CreateAlbumRequest{
 		Album: &photoslibrary.Album{
 			Title: albumName,
 		},
 	}).Do()
+	if newAlbumerr == nil {
+		client.createdAlbumsCache[albumName] = *newAlbum
+	}
+	return newAlbum, nil
+
 }
 
 // func (client *Client) UpsertAlbum(album photoslibrary.Album) (*photoslibrary.Album, error) {
