@@ -23,7 +23,11 @@ const basePath = "https://photoslibrary.googleapis.com/"
 type Client struct {
 	*photoslibrary.Service
 	*http.Client
-	token              *oauth2.Token
+	token *oauth2.Token
+	/*
+		createAlbumsCache is in memory cache of albums
+		created during one session
+	*/
 	createdAlbumsCache map[string]photoslibrary.Album
 }
 
